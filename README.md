@@ -315,7 +315,7 @@ It is structured intentionally to align with **backend engineering / API develop
 
 ---
 
-## 📌 Status
+## 📌 Current Status
 
 Active development.
 Design decisions may evolve as features expand.
