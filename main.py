@@ -13,7 +13,7 @@ import services
 app = FastAPI()
 
 # Create database tables if they do not exist yet
-Base.metadata.create_all(bind=engine)
+# removed Base.metadata.create_all(bind=engine) now that we are using Alembic for migrations 
 
 def get_db():
     db = SessionLocal()
