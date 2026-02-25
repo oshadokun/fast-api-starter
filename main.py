@@ -4,6 +4,8 @@ from schemas import PersonCreate, PersonResponse, PersonPatch
 from database import SessionLocal, engine, Base
 from fastapi.responses import JSONResponse
 from exceptions import NameAlreadyExistsException
+from exceptions import NameAlreadyExistsException, EmailAlreadyExistsException
+
 
 import models
 import crud
@@ -30,7 +32,12 @@ from sqlalchemy.exc import IntegrityError
 
 @app.post("/people", response_model=PersonResponse)
 def create_person(person: PersonCreate, db: Session = Depends(get_db)):
-    return services.create_person_service(db, person)
+    try:
+        return services.create_person_service(db, person)
+    except NameAlreadyExistsException:
+        return JSONResponse(status_code=400, content={"detail": "A person with this name already exists."})
+    except EmailAlreadyExistsException:
+        return JSONResponse(status_code=400, content={"detail": "A person with this email already exists."})
  
 @app.get("/people", response_model=list[schemas.PersonResponse])
 def get_people(

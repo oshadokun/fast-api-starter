@@ -7,7 +7,7 @@ class PersonDB(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, unique=True, index=True)
     age = Column(Integer, nullable=False)
-    email = Column(String, nullable=True)
+    email = Column(String, nullable=False, unique=True, index=True)
     
 class AuditLogDB(Base):
     __tablename__ = "audit_logs"

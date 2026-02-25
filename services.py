@@ -1,27 +1,33 @@
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
 import crud
-import schemas
-from exceptions import NameAlreadyExistsException
+from sqlalchemy.exc import IntegrityError
+from exceptions import NameAlreadyExistsException, EmailAlreadyExistsException
 
-def create_person_service(db: Session, person: schemas.PersonCreate):
+
+def create_person_service(db, person_in):
     try:
-        db_person = crud.create_person(db, person)
+        # create person
+        db_person = crud.create_person(db, person_in)
 
-        db.flush()
-        # flush sends staged INSERTs so db_person.id is assigned before commit
-
-        crud.create_audit_log(db, action="person_created", person_id=db_person.id)
-        crud.create_email_outbox(db, person_id=db_person.id, email_type="welcome")
+        # create related records if any
+        # ...
 
         db.commit()
         db.refresh(db_person)
         return db_person
 
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
-        raise NameAlreadyExistsException()
 
-    except:
+        msg = str(getattr(e, "orig", e))
+
+        if "UNIQUE constraint failed: people.name" in msg:
+            raise NameAlreadyExistsException()
+
+        if "UNIQUE constraint failed: people.email" in msg:
+            raise EmailAlreadyExistsException()
+
+        raise
+
+    except Exception:
         db.rollback()
         raise

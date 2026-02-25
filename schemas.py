@@ -1,65 +1,55 @@
-from pydantic import BaseModel, Field, field_validator,  model_validator
+# schemas.py (Day 11: keep validation, add email, keep PATCH rules)
+
+from pydantic import BaseModel, Field, EmailStr, model_validator, ConfigDict
 from typing import Optional
 
 
 class PersonBase(BaseModel):
     name: str = Field(..., min_length=2, max_length=50)
     age: int = Field(..., ge=0, le=120)
+    email: EmailStr
 
 
 class PersonCreate(PersonBase):
     pass
 
+
 # PUT: full update, all required
 class PersonUpdate(PersonBase):
     pass
 
-# PATCH: partial update, all optional, but still validated if provided
+
+# PATCH: partial update, all optional, but validated if provided
 class PersonPatch(BaseModel):
     name: Optional[str] = Field(None, min_length=2, max_length=50)
     age: Optional[int] = Field(None, ge=0, le=120)
+    email: Optional[EmailStr] = None
 
-
-    @field_validator("name",mode="before")
-    @classmethod
-    def name_cannot_be_null(cls, v):
-        if v is None:
-            raise ValueError("name cannot be null")
-        return v
-
-    @field_validator("age",mode="before")
-    @classmethod
-    def age_cannot_be_null(cls, v):
-        if v is None:
-            raise ValueError("age cannot be null")
-        return v
-    
     @model_validator(mode="after")
-    def at_least_one_field(self):
-        if not self.model_dump(exclude_unset=True):
-            raise ValueError("At least one field must be provided for PATCH")
-        return self
+    def at_least_one_field(cls, values):
+        # values is the model instance in Pydantic v2 "after" mode
+        if values.name is None and values.age is None and values.email is None:
+            raise ValueError("PATCH payload must include at least one field")
+        return values
+
 
 class PersonResponse(PersonBase):
     id: int
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        from_attributes = True
 
+# Optional: if you already have these in your project, keep them here too.
 class AuditLogResponse(BaseModel):
     id: int
     action: str
     person_id: int
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        from_attributes = True
 
 class EmailOutboxResponse(BaseModel):
     id: int
-    person_id: int
-    email_type: str
+    to_email: str
+    subject: str
+    body: str
     status: str
-    retry_count: int
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

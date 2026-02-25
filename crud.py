@@ -17,7 +17,7 @@ def create_person(db: Session, person: schemas.PersonCreate) -> models.PersonDB:
     if existing:
         raise NameAlreadyExistsException()
 
-    db_person = models.PersonDB(name=person.name, age=person.age)
+    db_person = models.PersonDB(name=person.name, age=person.age, email=person.email)
     db.add(db_person)
     return db_person
 
