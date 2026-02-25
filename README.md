@@ -310,13 +310,3 @@ Database constraints enforced.
 Service-layer transaction control implemented.
 Automated test coverage active.
 ```
-
----
-
-If you want, I can next:
-
-* Convert that diagram into a visual PNG/SVG diagram
-* Or add a test-flow diagram section
-* Or add a transaction lifecycle diagram
-
-You're now writing README like a mid-level backend engineer.
