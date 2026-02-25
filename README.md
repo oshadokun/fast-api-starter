@@ -1,11 +1,80 @@
-[5/50]
 
-```markdown
-# People API – FastAPI + SQLAlchemy + Alembic
+# People API – FastAPI + SQLAlchemy + Alembic + Pytest
+---
 
-A production-structured REST API built with **FastAPI**, **SQLAlchemy**, **SQLite**, and **Alembic**.
+# 🏛 Clean Architecture Overview
 
-This project demonstrates clean backend architecture, service-layer orchestration, transaction management, database migrations, validation discipline, and production-ready development patterns.
+```
+
+```
+            ┌────────────────────────────┐
+            │        Client (HTTP)       │
+            │  Swagger / Browser / Test  │
+            └──────────────┬─────────────┘
+                           │
+                           ▼
+            ┌────────────────────────────┐
+            │        main.py             │
+            │  Route Layer (FastAPI)     │
+            │  - Request validation      │
+            │  - Dependency injection    │
+            │  - Exception translation   │
+            └──────────────┬─────────────┘
+                           │
+                           ▼
+            ┌────────────────────────────┐
+            │       services.py          │
+            │  Service Layer             │
+            │  - Transaction boundary    │
+            │  - Orchestration           │
+            │  - IntegrityError mapping  │
+            │  - Commit / Rollback       │
+            └──────────────┬─────────────┘
+                           │
+                           ▼
+            ┌────────────────────────────┐
+            │        crud.py             │
+            │  Data Access Layer         │
+            │  - Pure DB operations      │
+            │  - No commits              │
+            │  - No HTTP logic           │
+            └──────────────┬─────────────┘
+                           │
+                           ▼
+            ┌────────────────────────────┐
+            │        models.py           │
+            │  SQLAlchemy ORM            │
+            │  - Tables                  │
+            │  - Constraints             │
+            │  - Relationships           │
+            └──────────────┬─────────────┘
+                           │
+                           ▼
+            ┌────────────────────────────┐
+            │         SQLite DB          │
+            │  - PRIMARY KEY             │
+            │  - UNIQUE constraints      │
+            │  - Foreign Keys            │
+            └────────────────────────────┘
+```
+
+```
+
+### Design Principles Enforced
+
+- Clear separation of concerns
+- Database constraints as source of truth
+- Service layer owns transactions
+- CRUD layer never commits
+- Routes never contain business logic
+- Errors translated at the correct abstraction level
+- Tests validate behavior at HTTP boundary
+
+---
+
+A production-structured REST API built with **FastAPI**, **SQLAlchemy**, **SQLite**, **Alembic**, and **Pytest**.
+
+This project demonstrates clean backend architecture, service-layer orchestration, transaction management, database migrations, validation discipline, automated testing, and production-ready development patterns.
 
 The project is actively evolving.
 
@@ -17,12 +86,15 @@ This API manages a `Person` resource while demonstrating:
 
 - Layered architecture (API → Service → CRUD → ORM)
 - Pydantic v2 validation with strict PATCH handling
+- Email validation using `EmailStr`
+- Database-level uniqueness enforcement
 - Transaction-safe service orchestration
-- Custom exception handling
-- Audit logging
+- Custom domain exception handling
+- Audit logging pattern
 - Email outbox pattern
 - Alembic migrations (schema versioning)
 - SQLite-safe schema evolution
+- Automated API testing with pytest
 
 ---
 
@@ -34,6 +106,8 @@ This API manages a `Person` resource while demonstrating:
 - Pydantic v2
 - SQLite
 - Alembic (database migrations)
+- Pytest (automated testing)
+- HTTPX (test client)
 - Uvicorn (ASGI server)
 
 ---
@@ -43,17 +117,20 @@ This API manages a `Person` resource while demonstrating:
 ```
 
 .
-├── main.py                # FastAPI app and routes
-├── database.py            # Engine, SessionLocal, Base
-├── models.py              # SQLAlchemy ORM models
-├── schemas.py             # Pydantic schemas (validation layer)
-├── crud.py                # Pure DB operations
-├── services.py            # Business logic + transactions
-├── exceptions.py          # Custom domain exceptions
-├── alembic.ini            # Alembic configuration
-├── alembic/               # Migration environment
-│   └── versions/          # Versioned migration scripts
-├── people.db              # SQLite database
+├── main.py
+├── database.py
+├── models.py
+├── schemas.py
+├── crud.py
+├── services.py
+├── exceptions.py
+├── alembic.ini
+├── alembic/
+│   └── versions/
+├── tests/
+│   ├── conftest.py
+│   └── test_people_api.py
+├── people.db
 ├── .gitignore
 └── README.md
 
@@ -72,15 +149,13 @@ This API manages a `Person` resource while demonstrating:
 - SessionLocal factory
 - Declarative Base
 
-SQLite is configured with:
+SQLite configured with:
 
 ```
 
 check_same_thread=False
 
 ```
-
-to allow usage within FastAPI’s async environment.
 
 ---
 
@@ -90,9 +165,11 @@ to allow usage within FastAPI’s async environment.
 
 ### PersonDB
 - id (PK)
-- name (unique, indexed)
-- age
-- email
+- name (unique, indexed, NOT NULL)
+- age (NOT NULL)
+- email (unique, indexed, NOT NULL)
+
+Email uniqueness enforced at the database level.
 
 ### AuditLogDB
 - id
@@ -108,24 +185,17 @@ to allow usage within FastAPI’s async environment.
 
 ---
 
-## 3️⃣ Alembic Migrations (Active)
+## 3️⃣ Alembic Migrations
 
-This project now uses **Alembic for schema versioning**.
+This project uses Alembic for schema versioning.
 
-### Example Migration Implemented
+Email column migration demonstrates:
 
-`add_email_to_person`
-
-- Adds `email` column to `people`
-- Backfills existing rows
-- Safely alters column nullability (SQLite batch mode)
-- Enforces NOT NULL constraint
-
-This demonstrates:
-
-- Forward-compatible schema evolution
-- Safe SQLite alteration strategy
-- Controlled database upgrades and downgrades
+- Backfill strategy
+- SQLite batch mode
+- Constraint enforcement
+- Safe NOT NULL transition
+- UNIQUE constraint addition
 
 ---
 
@@ -133,171 +203,52 @@ This demonstrates:
 
 **schemas.py**
 
-### PersonBase
-- name (2–50 characters)
-- age (0–120)
-
-### PersonCreate
-Used for POST
-
-### PersonUpdate
-Used for PUT (full replacement)
-
-### PersonPatch
-Used for PATCH (partial update)
-
-PATCH Safety Rules:
-
-- Rejects explicit null values
-- Requires at least one field
-- Validates provided fields strictly
-
-### Response Schemas
-
-- PersonResponse
-- AuditLogResponse
-- EmailOutboxResponse
-
-Configured with:
-
-```
-
-from_attributes = True
-
-```
+- Email validation via `EmailStr`
+- Strict PATCH validation rules
+- PUT vs PATCH separation
+- Response serialization via `from_attributes = True`
 
 ---
 
 ## 5️⃣ CRUD Layer
 
-**crud.py**
-
-Responsible for pure database operations only:
-
-- create_person
-- get_people (with filtering + pagination)
-- get_person
-- update_person
-- patch_person
-- delete_person
-- create_audit_log
-- create_email_outbox
-
-No transaction control logic exists here.
+- Pure DB access
+- No transaction logic
+- No HTTP knowledge
 
 ---
 
 ## 6️⃣ Service Layer
 
-**services.py**
-
-Handles:
-
-- Transaction control
-- Orchestration of:
-  - Person creation
-  - Audit log creation
-  - Email outbox creation
-- Rollbacks on failure
-- IntegrityError handling
-- Raising domain-level exceptions
-
-Example flow:
-
-```
-
-Create Person
-→ Flush (assign ID)
-→ Create Audit Log
-→ Create Email Outbox record
-→ Commit
-
-```
-
-This demonstrates real-world service orchestration patterns.
+- Controls transaction boundaries
+- Handles IntegrityError
+- Converts DB errors → domain exceptions
+- Orchestrates multi-step writes
+- Commits only after successful orchestration
 
 ---
 
 ## 7️⃣ FastAPI Application
 
-**main.py**
-
-Includes:
-
-- Dependency-injected DB session
+- Dependency-injected sessions
+- Centralized exception handlers
 - RESTful endpoints
-- Centralized exception handler
-- Health check endpoint
-- Integration with service layer
+- Clean HTTP error responses
 
 ---
 
-# 🔌 API Endpoints
+# 🧪 Automated Testing
 
-## Health
-```
+- Separate test database
+- Dependency override for `get_db`
+- Nested transaction rollback per test
+- API-level behavior validation
 
-GET /health
-
-```
-
----
-
-## Create Person
-```
-
-POST /people
+Run:
 
 ```
 
----
-
-## Get All People
-Supports:
-- skip
-- limit
-- min_age
-- name_contains
-
-```
-
-GET /people
-
-```
-
----
-
-## Get Person By ID
-```
-
-GET /people/{person_id}
-
-```
-
----
-
-## Update Person (Full Replace)
-```
-
-PUT /people/{person_id}
-
-```
-
----
-
-## Patch Person (Partial Update)
-```
-
-PATCH /people/{person_id}
-
-```
-
----
-
-## Delete Person
-```
-
-DELETE /people/{person_id}
+pytest -v
 
 ```
 
@@ -305,45 +256,23 @@ DELETE /people/{person_id}
 
 # ⚙️ Running the Project
 
-## 1️⃣ Create Virtual Environment
+Create environment:
 
 ```
 
-python -m venv venv
+python -m venv .venv
 
 ```
 
-Activate:
-
-Windows:
-```
-
-venv\Scripts\activate
+Install:
 
 ```
 
-Mac/Linux:
-```
-
-source venv/bin/activate
+pip install fastapi uvicorn sqlalchemy alembic pytest httpx "pydantic[email]"
 
 ```
 
----
-
-## 2️⃣ Install Dependencies
-
-```
-
-pip install fastapi uvicorn sqlalchemy alembic
-
-```
-
----
-
-## 3️⃣ Run Database Migrations
-
-Initialize database to latest schema:
+Migrate:
 
 ```
 
@@ -351,33 +280,7 @@ alembic upgrade head
 
 ```
 
-Check migration history:
-
-```
-
-alembic history
-
-```
-
-Generate new migration:
-
-```
-
-alembic revision --autogenerate -m "your message"
-
-```
-
-Apply migration:
-
-```
-
-alembic upgrade head
-
-```
-
----
-
-## 4️⃣ Start the Server
+Run:
 
 ```
 
@@ -385,70 +288,35 @@ uvicorn main:app --reload
 
 ```
 
-Access:
-
-- API: http://127.0.0.1:8000
-- Swagger UI: http://127.0.0.1:8000/docs
-
 ---
 
-# 🧠 Backend Engineering Concepts Demonstrated
+# 🧠 Engineering Concepts Demonstrated
 
-- Layered architecture
 - Transaction boundaries
-- Database migrations
-- Service orchestration
-- Domain exception handling
-- Validation beyond type checking
-- Email outbox pattern
-- Audit trail pattern
-- SQLite-safe schema evolution
-- Clean separation of concerns
-
----
-
-# 🛠 Roadmap
-
-Planned improvements:
-
-- Unit tests (pytest)
-- Integration tests
-- Background email processor
-- Structured logging
-- Dockerization
-- Environment configuration separation
-- Authentication (JWT)
-- CI/CD pipeline
-- Production database support (PostgreSQL)
-
----
-
-# 🎯 Role Alignment
-
-This project demonstrates patterns expected in:
-
-- Backend Developer roles
-- API Engineer roles
-- Python Developer roles
-- Junior → Mid-level Backend Engineering positions
-
-Key competencies showcased:
-
-- API design
-- Schema evolution
-- Transaction handling
-- Data modeling
-- Validation strategy
-- Service abstraction
-- Migration management
+- IntegrityError mapping
+- Database-first validation
+- Service-layer orchestration
+- Migration discipline
+- Automated API testing
+- Layered backend architecture
 
 ---
 
 # 📌 Status
 
 Active development.
-
-Schema migrations are now version-controlled via Alembic.
-
-Architecture is intentionally structured for production scalability.
+Production-structured architecture.
+Database constraints enforced.
+Service-layer transaction control implemented.
+Automated test coverage active.
 ```
+
+---
+
+If you want, I can next:
+
+* Convert that diagram into a visual PNG/SVG diagram
+* Or add a test-flow diagram section
+* Or add a transaction lifecycle diagram
+
+You're now writing README like a mid-level backend engineer.
