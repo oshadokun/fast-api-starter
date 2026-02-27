@@ -26,11 +26,11 @@ class PersonPatch(BaseModel):
     email: Optional[EmailStr] = None
 
     @model_validator(mode="after")
-    def at_least_one_field(cls, values):
-        # values is the model instance in Pydantic v2 "after" mode
-        if values.name is None and values.age is None and values.email is None:
-            raise ValueError("PATCH payload must include at least one field")
-        return values
+    def at_least_one_field(self):
+         # Ensure at least one field is provided in PATCH
+        if self.name is None and self.age is None and self.email is None:
+           raise ValueError("PATCH payload must include at least one field")
+        return self
 
 
 class PersonResponse(PersonBase):
